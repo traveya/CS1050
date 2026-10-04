@@ -1,7 +1,7 @@
 # Give a report on k-anonymity
 import pandas as pd
 
-df = pd.read_csv("raw_data.csv", dtype=str, keep_default_na=False)
+df = pd.read_csv("anonymized_data.csv", dtype=str, keep_default_na=False)
 
 # Get key information
 pos_cols = ["cc_by_ip", "city", "postalCode", "LoE", "YoB", "gender"]
@@ -58,5 +58,10 @@ for target_k in [2, 5, 10, 20]:
         f"({suppressed / num_rows:.2%}), "
         f"retain {retained:,}"
     )
+    
+# Display the smallest groups and their identifying combinations.
+print("\nSMALLEST GROUPS")
+print(groups.sort_values("group_size").head(20).to_string(index=False))
 
 print("\nEND K-ANON REPORT")
+
