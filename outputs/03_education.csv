@@ -1,0 +1,16 @@
+category,rows,percent_of_rows,dataset
+Bachelor’s,59422,29.711148555742778,Original
+Master’s / professional,48204,24.102120510602553,Original
+High school,35706,17.85308926544633,Original
+Unknown,27991,13.99556997784989,Original
+Doctorate,9114,4.557022785113926,Original
+Associate,8224,4.112020560102801,Original
+Junior high,4542,2.271011355056775,Original
+Other education,3721,1.8605093025465127,Original
+Doctorate in science/engineering,1105,0.5525027625138126,Original
+Doctorate in another field,732,0.36600183000915004,Original
+Elementary,703,0.35150175750878754,Original
+No formal education,535,0.26750133750668753,Original
+college or above,124708,64.1073356294659,Anonymized
+no college education,39792,20.45545674189071,Anonymized
+Unknown,30030,15.437207628643396,Anonymized

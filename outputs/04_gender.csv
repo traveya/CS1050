@@ -1,0 +1,9 @@
+category,rows,percent_of_rows,dataset
+Male,102399,51.19975599877999,Original
+Female,70357,35.17867589337947,Original
+Other / prefer not to say,978,0.48900244501222506,Original
+[Missing],26265,13.132565662828313,Original
+Male,100037,51.424973011874776,Anonymized
+Female,68457,35.19097311468668,Anonymized
+Other / prefer not to say,547,0.2811905618670642,Anonymized
+[Missing],25489,13.10286331157148,Anonymized

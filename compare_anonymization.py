@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 
 FOLDER = Path(__file__).resolve().parent
 ORIGINAL_FILE = "raw_data.csv"
-ANONYMIZED_FILE = "anonymized_data.csv"
+ANONYMIZED_FILE = "suppressed_anonymized_data.csv"
 OUTPUT_FOLDER = "outputs"
 MAX_CATEGORIES = 18
 CHANGE_THRESHOLD_PP = 2.0  # Descriptive threshold, not a significance test.
@@ -118,17 +118,37 @@ EDUCATION_ALIASES = {
 
 
 def align_education(frames):
-    def canonical(series):
-        return clean(series).map(lambda v: EDUCATION.get(v, EDUCATION_ALIASES.get(v.lower(), v)))
-    broad = any("LoE" in f and canonical(f.LoE).isin(set(BROAD_EDUCATION.values())).any()
-                for f in frames)
+    mapping = {
+        # Original data: preserve detailed education.
+        "p": "Doctorate",
+        "p_se": "Doctorate in science/engineering",
+        "p_oth": "Doctorate in another field",
+        "m": "Master’s / professional",
+        "b": "Bachelor’s",
+        "a": "Associate",
+        "hs": "High school",
+        "jhs": "Junior high",
+        "el": "Elementary",
+        "none": "No formal education",
+        "other": "Other education",
+
+        # Anonymized data: preserve the three generalized categories.
+        "college or above": "college or above",
+        "no college education": "no college education",
+        "unknown": "Unknown",
+        "[missing]": "Unknown",
+    }
+
     def convert(series):
-        s = canonical(series)
-        return s.replace(BROAD_EDUCATION) if broad else s
-    note = "Legacy doctorate codes are combined in both files. Other education and missing education stay separate."
-    if broad:
-        note += " Both files use school-or-less, undergraduate, and postgraduate groups; degree-level distinctions are lost."
-    return convert, note
+        values = clean(series)
+        return values.map(
+            lambda value: mapping.get(value.lower(), value)
+        )
+
+    return convert, (
+        "Original education retains detailed categories; anonymized "
+        "education shows college or above, no college education, and Unknown."
+    )
 
 
 def missing_reason(frame, columns):
@@ -176,6 +196,123 @@ def aggregate(frame, groups, categories, participation):
 
 def draw_and_summarize(spec, frames, labels, out):
     slug, title, column, convert, note, participation = spec
+    if column == "LoE":
+        required = ["LoE"] + (["nforum_posts"] if participation else [])
+        metric = "mean_posts" if participation else "percent_of_rows"
+        xlabel = (
+            "Mean forum posts per row with a valid count"
+            if participation else "Percentage of all rows"
+        )
+
+        tables = []
+
+        for index, frame in enumerate(frames):
+            reason = missing_reason(frame, required)
+
+            if reason:
+                tables.append((None, reason))
+                continue
+
+            values = convert(frame["LoE"])
+
+            if index == 0:
+                # Original: retain every detailed education category.
+                categories = values.value_counts().index.tolist()
+            else:
+                # Anonymized: display exactly these three categories.
+                categories = [
+                    "college or above",
+                    "no college education",
+                    "Unknown",
+                ]
+
+                unexpected = set(values) - set(categories)
+                if unexpected:
+                    raise ValueError(
+                        "Anonymized LoE contains unexpected values: "
+                        f"{sorted(unexpected)}"
+                    )
+
+            table = aggregate(
+                frame, values, categories, participation
+            )
+            tables.append((table, None))
+
+        # Share numerical scale, but NOT category axes.
+        fig, axes = plt.subplots(
+            1, 2, figsize=(16, 8), sharex=True, sharey=False
+        )
+
+        maxima = [
+            table[metric].max()
+            for table, _ in tables
+            if table is not None and table[metric].notna().any()
+        ]
+        limit = max([0.1] + maxima) * 1.4
+
+        exports = []
+
+        for ax, frame, label, (table, reason) in zip(
+            axes, frames, labels, tables
+        ):
+            ax.set_title(f"{label} · {len(frame):,} rows")
+            ax.set_xlim(0, limit)
+            ax.set_xlabel(xlabel)
+
+            if reason:
+                ax.text(
+                    0.5, 0.5, reason,
+                    transform=ax.transAxes,
+                    ha="center", va="center", wrap=True
+                )
+                continue
+
+            y = np.arange(len(table))
+            values = table[metric].to_numpy(dtype=float)
+
+            ax.barh(
+                y, np.nan_to_num(values),
+                color="#3676a8" if label == labels[0] else "#d08038"
+            )
+            ax.set_yticks(y, table["category"])
+            ax.invert_yaxis()
+
+            for i, row in table.iterrows():
+                value = row[metric]
+
+                if pd.isna(value):
+                    text = "No valid observations"
+                elif participation:
+                    text = (
+                        f"{value:.2f}; "
+                        f"n={int(row['valid_post_rows']):,}"
+                    )
+                else:
+                    text = f"{value:.1f}%; n={int(row['rows']):,}"
+
+                ax.text(
+                    (value if pd.notna(value) else 0) + limit * 0.01,
+                    i, text, va="center", fontsize=8
+                )
+
+            exports.append(table.assign(dataset=label))
+
+        fig.suptitle(title)
+        fig.text(0.02, 0.02, textwrap.fill(note, 140), fontsize=9)
+        fig.tight_layout(rect=(0, 0.09, 1, 0.95))
+        fig.savefig(out / f"{slug}.png", dpi=160)
+        plt.close(fig)
+
+        if exports:
+            pd.concat(exports, ignore_index=True).to_csv(
+                out / f"{slug}.csv", index=False
+            )
+
+        return (
+            f"## {title}\n\n{note}\n\n"
+            "Categories have different granularity, so direct "
+            "category-by-category percentage changes are not calculated."
+        )
     required = [column] + (["nforum_posts"] if participation else [])
     reasons = [missing_reason(f, required) for f in frames]
     # Unknown new category schemes are not silently treated as equivalent.
