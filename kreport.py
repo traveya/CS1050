@@ -58,10 +58,38 @@ for target_k in [2, 5, 10, 20]:
         f"({suppressed / num_rows:.2%}), "
         f"retain {retained:,}"
     )
-    
-# Display the smallest groups and their identifying combinations.
-print("\nSMALLEST GROUPS")
-print(groups.sort_values("group_size").head(20).to_string(index=False))
 
-print("\nEND K-ANON REPORT")
+# Suppress rows in groups smaller than k=5
+target_k = 5
+
+row_group_sizes = (
+    df.groupby(data_cols, dropna=False)[data_cols[0]]
+      .transform("size")
+)
+
+suppressed_df = df.loc[row_group_sizes >= target_k].copy()
+
+output_file = "suppressed_anonymized_data.csv"
+suppressed_df.to_csv(output_file, index=False)
+
+num_suppressed = num_rows - len(suppressed_df)
+
+print("\nK=5 SUPPRESSION COMPLETE")
+print(f"Rows removed:  {num_suppressed:,} ({num_suppressed / num_rows:.2%})")
+print(f"Rows retained: {len(suppressed_df):,}")
+print(f"Saved to:      {output_file}")
+
+# Verify k-value
+if not suppressed_df.empty:
+    final_k = suppressed_df.groupby(data_cols, dropna=False).size().min()
+    print(f"Verified minimum k: {final_k}")
+else:
+    print("No rows remain; k is undefined.")
+
+# Display the smallest groups and their identifying combinations
+# Used to determine k level when fewer than 20 unique groups exist.
+# print("\nSMALLEST GROUPS")
+# print(groups.sort_values("group_size").head(20).to_string(index=False))
+#
+# print("\nEND K-ANON REPORT")
 
